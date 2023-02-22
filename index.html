@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>双击删除节点</title>
+    <script src="draw.js"></script>
+</head>
+<body>
+  <input id="input-field" type="text">
+  <button id="add-button">添加</button>
+  <br>
+  <input id="source-field" type="text">
+  <input id="target-field" type="text">
+  <button id="add-link-button">添加链接</button>
+  <br>
+  <input id="source-field-del" type="text">
+  <input id="target-field-del" type="text">
+  <button id="del-link-button">删除链接</button>
+<script>
+    var width = 1566;
+    var height = 768;
+    var img_w = 77;
+    var img_h = 80;
+    var radius = 30;
+
+    // 选择输入框和添加按钮元素
+    var inputField = d3.select("#input-field");
+    var addButton = d3.select("#add-button");
+    // 选中文本框和按钮元素
+    var sourceField = d3.select("#source-field");
+    var targetField = d3.select("#target-field");
+    var addLinkButton = d3.select("#add-link-button");
+    // 选中文本框和按钮元素 删除边
+    var sourceDel = d3.select("#source-field-del");
+    var targetDel = d3.select("#target-field-del");
+    var delLinkButton = d3.select("#del-link-button");
+
+
+    var svg = d3.select("body")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    d3.json("song.json", function (error, data) {
+        if (error) {
+            return console.log(error);
+        }
+        var dataset = data;
+        console.log("dataset = \n",dataset);
+
+        var force = d3.layout.force()
+            .nodes(dataset.nodes)
+            .links(dataset.links)
+            .size([width, height])
+            .linkDistance(90)
+            .charge(-1500)
+            .start();
+
+        var links = svg.selectAll("line")
+            .data(dataset.links)
+            .enter()
+            .append("line")
+            .attr("class", "lines")
+            .attr("style", "stroke: #ff0000; stroke-width: 2;");
+
+
+        var nodes = svg.selectAll("circle")
+            .data(dataset.nodes)
+            .enter()
+            .append("circle")
+            .attr("r", radius)
+            .attr("class", "nodes")
+            .attr("fill", "pink")
+            .on("dblclick", function (d) {
+                //双击节点删除，获取选中节点的在json中的name的值
+                d3.select(this).remove();
+                var clickNodeName = d.name;//点击节点的名字
+                d3.selectAll(".nodetext").each(function (d, i) {
+                    var temp = d.name;
+                    if (temp == clickNodeName) {
+                        //						   				alert("相等");
+                        d3.select(this).remove();
+                    }
+                });
+                d3.selectAll(".lines").each(function (e) {
+                    if (e.source === d || e.target === d) {
+                        d3.select(this).remove();
+                    }
+                })
+            })
+            .on("mouseout", function (d, i) {
+                nodes.style("stroke", function (edge) {
+                    if (edge.source === d) {
+                        return "#ffff0f";
+                    }
+                });
+                links.style("stroke", "#000fff");
+            })
+            .call(force.drag);
+
+        var text_dx = 0;
+        var text_dy = 0;
+        console.log("x：" + text_dx);
+        console.log("y: " + text_dy);
+
+        var nodes_text = svg.selectAll(".nodetext")
+            .data(dataset.nodes)
+            .enter()
+            .append("text")
+            .attr("class", "nodetext")
+            .attr("dy", ".35em")
+            .attr("text-anchor", "middle")
+            .text(function (d) {
+                return d.name;
+            });
+        force.on("tick", function () {
+
+            links.attr("x1", function (d) {
+                return d.source.x;
+            })
+                .attr("y1", function (d) {
+                    return d.source.y;
+                })
+                .attr("x2", function (d) {
+                    return d.target.x;
+                })
+                .attr("y2", function (d) {
+                    return d.target.y;
+                });
+
+            nodes.attr("cx", function (d) {
+                return d.x;
+            })
+                .attr("cy", function (d) {
+                    return d.y;
+                });
+
+            nodes_text.attr("dx", function (d) {
+                return d.x - img_w / 4;
+            })
+                .attr("dy", function (d) {
+                    return d.y + 5;
+                });
+        });
+
+
+// 绑定添加按钮的点击事件
+        addButton.on("click", function () {
+            // 获取输入框中的值
+            var nodeName = inputField.property("value");
+
+            // 添加新的节点
+            var newNode = {name: nodeName};
+            dataset.nodes.push(newNode);
+            // console.log(dataset)
+            // console.log(newNode.name)
+            update(); // 更新力导向图
+            // 清空输入框
+            inputField.property("value", "");
+        });
+
+// 绑定按钮的点击事件 加边
+        addLinkButton.on("click", function () {
+            // 从文本框中获取源节点和目标节点的ID
+            var sourceId = sourceField.property("value");
+            var targetId = targetField.property("value");
+            // 创建一个新链接对象
+            var newLink = {source: dataset.nodes[sourceId], target: dataset.nodes[targetId]};
+            // 将新链接添加到链接数据数组中
+            dataset.links.push(newLink);
+            // 更新力导向图
+            update();
+        });
+
+// 绑定按钮的点击事件 删除边
+        delLinkButton.on("click", function () {
+            // 从文本框中获取源节点和目标节点的ID
+            var sourceId = sourceDel.property("value");
+            var targetId = targetDel.property("value");
+
+            // 创建一个新链接对象
+            var newLink = {source: dataset.nodes[sourceId], target: dataset.nodes[targetId]};
+            // 将新链接添加到链接数据数组中
+            dataset.links.pop(newLink);
+            // 更新力导向图
+            update();
+        });
+
+
+// 更新力导向图
+        function update() {
+            // 更新节点和边的选择集
+            // var nodes = svg.selectAll("circle")
+            //         .data(dataset.nodes, function(d) { return d.id; });
+            //
+            // var links = svg.selectAll("line")
+            //         .data(dataset.links, function(d) { return d.source.id + "-" + d.target.id; });
+
+
+            nodes = nodes.data(force.nodes());
+            links = links.data(force.links());
+            // 添加新的节点和边的选择集
+            nodes_text = svg.selectAll(".nodetext")
+                  .data(dataset.nodes)
+                  .enter()
+                  .append("text")
+                  .attr("class", "nodetext")
+                  .attr("dy", ".35em")
+                  .attr("text-anchor", "middle")
+            nodes.enter()
+                .append("circle")
+                .attr("r", radius)
+                .attr("class", "nodes")
+                .attr("fill", "pink")
+                .on("dblclick", function (d) {
+                    //双击节点删除，获取选中节点的在json中的name的值
+                    d3.select(this).remove();
+                    var clickNodeName = d.name;//点击节点的名字
+                    d3.selectAll(".nodetext").each(function (d, i) {
+                        var temp = d.name;
+                        if (temp == clickNodeName) {
+                            //						   				alert("相等");
+                            d3.select(this).remove();
+                        }
+                    });
+                    d3.selectAll(".lines").each(function (e) {
+                        if (e.source === d || e.target === d) {
+                            d3.select(this).remove();
+                        }
+                    })
+                })
+                .on("mouseout", function (d, i) {
+                    nodes.style("stroke", function (edge) {
+                        if (edge.source === d) {
+                            return "#CCCCCC";
+                        }
+                    });
+                    links.style("stroke", "#CCCCCC");
+                })
+                .call(force.drag);
+            //nodes.exit().remove();
+
+
+            console.log(links)
+            links.enter()
+                .append("line")
+                .attr("class", "lines")
+                .attr("style", "stroke: #CCCCCC; stroke-width: 20;");
+            // 删除节点和边的选择集
+            nodes.exit().remove();
+            links.exit().remove();
+            // nodes_text.exit().remove();
+
+            // 重新启动力导向布局
+            force.start();
+        }
+
+
+    });
+
+</script>
+</body>
+</html>
